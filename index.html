@@ -85,17 +85,37 @@
         let currentUser = null;
         let currentStreakData = null;
 
-        // Monitor Auth Changes automatically (Page loads, logins, logouts)
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                currentUser = session.user;
-                fetchUserStreak();
-            } else {
-                currentUser = null;
-                currentStreakData = null;
-                showView('view-auth');
+        // FORCE INTENTIONAL ROUTING CHECK FOR STATIC HOSTING (GitHub Pages)
+        async function checkInitialSession() {
+            try {
+                // Look at the address bar right now to see if an auth token is passing through
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (session) {
+                    currentUser = session.user;
+                    await fetchUserStreak();
+                } else {
+                    // If no active link token is detected in the URL, establish standard auth listening
+                    setupAuthListener();
+                }
+            } catch (err) {
+                console.error("Session initialization failed:", err);
+                setupAuthListener();
             }
-        });
+        }
+
+        function setupAuthListener() {
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    currentUser = session.user;
+                    fetchUserStreak();
+                } else {
+                    currentUser = null;
+                    currentStreakData = null;
+                    showView('view-auth');
+                }
+            });
+        }
 
         // Switch application views UI
         function showView(viewId) {
@@ -113,7 +133,7 @@
             const { error } = await supabaseClient.auth.signInWithOtp({
                 email: email,
                 options: {
-                    emailRedirectTo: window.location.href // Automatically returns them to this page
+                    emailRedirectTo: window.location.origin + window.location.pathname // Clean extraction of current URL
                 }
             });
 
@@ -133,6 +153,10 @@
                 .select('*')
                 .maybeSingle(); // Returns null safely if row doesn't exist yet
 
+            if (error) {
+                console.error("Error checking database:", error.message);
+            }
+
             if (!data) {
                 // First time user logged in: insert their row into cloud DB
                 const today = new Date();
@@ -144,6 +168,10 @@
                     .select()
                     .single();
                 
+                if (insertError) {
+                    alert("Failed to initialize your database streak row: " + insertError.message);
+                    return;
+                }
                 data = newRow;
             }
 
@@ -207,6 +235,9 @@
         async function handleLogout() {
             await supabaseClient.auth.signOut();
         }
+
+        // KICK OFF RUNTIME EXECUTION IMMEDIATELY ON LOAD
+        checkInitialSession();
     </script>
 </body>
 </html>

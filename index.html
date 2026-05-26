@@ -80,7 +80,7 @@
         const SUPABASE_URL = "https://gqibsiierfrmjyybsymw.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWJzaWllcmZybWp5eWJzeW13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTMzNjMsImV4cCI6MjA5NTM4OTM2M30.7hTatepDiU5lnZBIZD0QNCUq3ofKkuPrkfpc9phGnpY";
 
-        const supabase = ::supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
         let currentStreakData = null;
 

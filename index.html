@@ -24,7 +24,7 @@
         .habit-header { font-size: 1.5rem; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
         .counter-display { font-size: 6.5rem; font-weight: 900; color: var(--accent); line-height: 1; margin: 15px 0; }
         .unit { font-size: 1.25rem; font-weight: 600; color: var(--text-muted); margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group { margin-bottom: 20px; text-align: left; border: none; }
         label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
         input { width: 100%; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; outline: none; margin-bottom: 10px; }
         input:focus { border-color: var(--primary); }
@@ -47,10 +47,10 @@
         <div id="view-auth" class="hidden">
             <h2 style="margin-bottom: 10px;">Sign In / Sign Up</h2>
             <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Enter your email to receive a secure, passwordless magic login link.</p>
-            <div class="input-group">
-                <input type="email" id="auth-email" placeholder="yourname@example.com">
-                <button class="btn btn-primary" onclick="handleAuth()">Send Magic Link</button>
-            </div>
+            <form class="input-group" onsubmit="handleAuthForm(event)">
+                <input type="email" id="auth-email" placeholder="yourname@example.com" required>
+                <button type="submit" class="btn btn-primary">Send Magic Link</button>
+            </form>
         </div>
 
         <div id="view-tracker" class="hidden">
@@ -123,6 +123,12 @@
                 document.getElementById(id).classList.add('hidden');
             });
             document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // Intercept standard form behavior to process the login link cleanly
+        async function handleAuthForm(event) {
+            event.preventDefault(); // Stop page from hard-reloading on submission
+            await handleAuth();
         }
 
         // Send a passwordless login link to the user's email
@@ -241,3 +247,5 @@
     </script>
 </body>
 </html>
+
+```

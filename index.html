@@ -33,7 +33,7 @@
         .btn-primary:hover { background-color: var(--primary-hover); }
         .btn-danger { background-color: var(--danger); color: white; }
         .btn-danger:hover { background-color: var(--danger-hover); }
-        .btn-logout { background: none; color: var(--text-muted); text-decoration: underline; font-size: 0.9rem; margin-top: 15px; }
+        .btn-logout { background: none; color: var(--text-muted); text-decoration: underline; font-size: 0.9rem; margin-top: 15px; border: none; cursor: pointer; }
         .settings-toggle { background: none; border: none; color: var(--primary); font-size: 0.9rem; cursor: pointer; margin-top: 15px; text-decoration: underline; display: block; margin: 15px auto 0 auto; }
         .hidden { display: none; }
         .loading { font-size: 1.2rem; color: var(--text-muted); }
@@ -76,16 +76,17 @@
     </div>
 
     <script>
-        // REPLACE THESE WITH YOUR ACTUAL SUPABASE CREDENTIALS
+        // SUPABASE CREDENTIALS CONFIGURATION
         const SUPABASE_URL = "https://gqibsiierfrmjyybsymw.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWJzaWllcmZybWp5eWJzeW13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTMzNjMsImV4cCI6MjA5NTM4OTM2M30.7hTatepDiU5lnZBIZD0QNCUq3ofKkuPrkfpc9phGnpY";
 
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Initialize client under a unique name to avoid global naming collisions
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
         let currentStreakData = null;
 
         // Monitor Auth Changes automatically (Page loads, logins, logouts)
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
             if (session) {
                 currentUser = session.user;
                 fetchUserStreak();
@@ -109,7 +110,7 @@
             const email = document.getElementById('auth-email').value.trim();
             if (!email) return alert('Please enter a valid email address.');
 
-            const { error } = await supabase.auth.signInWithOtp({
+            const { error } = await supabaseClient.auth.signInWithOtp({
                 email: email,
                 options: {
                     emailRedirectTo: window.location.href // Automatically returns them to this page
@@ -127,7 +128,7 @@
         async function fetchUserStreak() {
             showView('view-loading');
             
-            let { data, error } = await supabase
+            let { data, error } = await supabaseClient
                 .from('streaks')
                 .select('*')
                 .maybeSingle(); // Returns null safely if row doesn't exist yet
@@ -137,7 +138,7 @@
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
-                const { data: newRow, error: insertError } = await supabase
+                const { data: newRow, error: insertError } = await supabaseClient
                     .from('streaks')
                     .insert([{ user_id: currentUser.id, habit_name: 'Donuts', start_date: today.toISOString() }])
                     .select()
@@ -170,7 +171,7 @@
 
         // Sync local updates back up to cloud database securely
         async function updateDatabase(updatedFields) {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('streaks')
                 .update({ ...updatedFields, updated_at: new Date().toISOString() })
                 .eq('user_id', currentUser.id)
@@ -204,7 +205,7 @@
         }
 
         async function handleLogout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
         }
     </script>
 </body>

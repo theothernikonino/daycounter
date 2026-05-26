@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Days Without Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --primary: #3b82f6; 
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --accent: #10b981; 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .card { background: var(--card-bg); padding: 40px; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); text-align: center; max-width: 420px; width: 100%; }
+        .habit-header { font-size: 1.5rem; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .counter-display { font-size: 6.5rem; font-weight: 900; color: var(--accent); line-height: 1; margin: 15px 0; }
+        .unit { font-size: 1.25rem; font-weight: 600; color: var(--text-muted); margin-bottom: 25px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+        input { width: 100%; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; outline: none; margin-bottom: 10px; }
+        input:focus { border-color: var(--primary); }
+        .btn { border: none; padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+        .btn-logout { background: none; color: var(--text-muted); text-decoration: underline; font-size: 0.9rem; margin-top: 15px; }
+        .settings-toggle { background: none; border: none; color: var(--primary); font-size: 0.9rem; cursor: pointer; margin-top: 15px; text-decoration: underline; display: block; margin: 15px auto 0 auto; }
+        .hidden { display: none; }
+        .loading { font-size: 1.2rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div id="view-loading" class="loading">Loading your streak...</div>
+
+        <div id="view-auth" class="hidden">
+            <h2 style="margin-bottom: 10px;">Sign In / Sign Up</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Enter your email to receive a secure, passwordless magic login link.</p>
+            <div class="input-group">
+                <input type="email" id="auth-email" placeholder="yourname@example.com">
+                <button class="btn btn-primary" onclick="handleAuth()">Send Magic Link</button>
+            </div>
+        </div>
+
+        <div id="view-tracker" class="hidden">
+            <h1 class="habit-header" id="habit-title">Days Without</h1>
+            <div class="counter-display" id="streak-number">0</div>
+            <div class="unit" id="unit-text">Days</div>
+            
+            <button class="btn btn-danger" onclick="resetStreak()">Restart Counter</button>
+            <button class="settings-toggle" onclick="showView('view-setup')">Customize Goal</button>
+            <p class="info-text" id="start-date-display" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;"></p>
+            <button class="btn btn-logout" onclick="handleLogout()">Log Out</button>
+        </div>
+
+        <div id="view-setup" class="hidden">
+            <h2 style="margin-bottom: 20px;">Customize Tracker</h2>
+            <div class="input-group">
+                <label for="habit-input">What are you tracking?</label>
+                <input type="text" id="habit-input" placeholder="e.g., Donuts, Soda, Coffee">
+            </div>
+            <button class="btn btn-primary" onclick="saveCustomHabit()">Save Changes</button>
+            <button class="settings-toggle" onclick="showView('view-tracker')" style="color: var(--text-muted);">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // REPLACE THESE WITH YOUR ACTUAL SUPABASE CREDENTIALS
+        const SUPABASE_URL = "https://gqibsiierfrmjyybsymw.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaWJzaWllcmZybWp5eWJzeW13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTMzNjMsImV4cCI6MjA5NTM4OTM2M30.7hTatepDiU5lnZBIZD0QNCUq3ofKkuPrkfpc9phGnpY";
+
+        const supabase = ::supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+        let currentStreakData = null;
+
+        // Monitor Auth Changes automatically (Page loads, logins, logouts)
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                currentUser = session.user;
+                fetchUserStreak();
+            } else {
+                currentUser = null;
+                currentStreakData = null;
+                showView('view-auth');
+            }
+        });
+
+        // Switch application views UI
+        function showView(viewId) {
+            ['view-loading', 'view-auth', 'view-tracker', 'view-setup'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // Send a passwordless login link to the user's email
+        async function handleAuth() {
+            const email = document.getElementById('auth-email').value.trim();
+            if (!email) return alert('Please enter a valid email address.');
+
+            const { error } = await supabase.auth.signInWithOtp({
+                email: email,
+                options: {
+                    emailRedirectTo: window.location.href // Automatically returns them to this page
+                }
+            });
+
+            if (error) {
+                alert('Error sending magic link: ' + error.message);
+            } else {
+                alert('Check your email! Click the magic link to log in instantly.');
+            }
+        }
+
+        // Fetch user streak from cloud database or create default entry if new user
+        async function fetchUserStreak() {
+            showView('view-loading');
+            
+            let { data, error } = await supabase
+                .from('streaks')
+                .select('*')
+                .maybeSingle(); // Returns null safely if row doesn't exist yet
+
+            if (!data) {
+                // First time user logged in: insert their row into cloud DB
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                const { data: newRow, error: insertError } = await supabase
+                    .from('streaks')
+                    .insert([{ user_id: currentUser.id, habit_name: 'Donuts', start_date: today.toISOString() }])
+                    .select()
+                    .single();
+                
+                data = newRow;
+            }
+
+            currentStreakData = data;
+            document.getElementById('habit-input').value = data.habit_name;
+            updateDisplay(new Date(data.start_date), data.habit_name);
+            showView('view-tracker');
+        }
+
+        function updateDisplay(startDate, habitName) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const diffTime = today - startDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const currentStreak = diffDays + 1;
+
+            document.getElementById('habit-title').innerText = `Days Without ${habitName}`;
+            document.getElementById('streak-number').innerText = currentStreak;
+            document.getElementById('unit-text').innerText = currentStreak === 1 ? 'Day' : 'Days';
+            
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('start-date-display').innerText = `Streak started on: ${startDate.toLocaleDateString(undefined, options)}`;
+        }
+
+        // Sync local updates back up to cloud database securely
+        async function updateDatabase(updatedFields) {
+            const { data, error } = await supabase
+                .from('streaks')
+                .update({ ...updatedFields, updated_at: new Date().toISOString() })
+                .eq('user_id', currentUser.id)
+                .select()
+                .single();
+
+            if (!error) {
+                currentStreakData = data;
+                updateDisplay(new Date(data.start_date), data.habit_name);
+            } else {
+                alert("Database update failed: " + error.message);
+            }
+        }
+
+        function resetStreak() {
+            if (confirm(`Are you sure you want to reset your "${currentStreakData.habit_name}" tracker back to Day 1?`)) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                updateDatabase({ start_date: today.toISOString() });
+            }
+        }
+
+        function saveCustomHabit() {
+            const inputVal = document.getElementById('habit-input').value.trim();
+            if (inputVal) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                updateDatabase({ habit_name: inputVal, start_date: today.toISOString() });
+                showView('view-tracker');
+            }
+        }
+
+        async function handleLogout() {
+            await supabase.auth.signOut();
+        }
+    </script>
+</body>
+</html>
